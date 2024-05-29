@@ -1,0 +1,46 @@
+{
+  "listOfImageIdToInclude": {
+    "type": "Array",
+    "metadata": {
+      "displayName": "Optional: List of VM images that have supported Linux OS to add to scope",
+      "description": "Example value: '/subscriptions/<subscriptionId>/resourceGroups/YourResourceGroup/providers/Microsoft.Compute/images/ContosoStdImage'"
+    },
+    "defaultValue": []
+  },
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy"
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "enableProcessesAndDependencies": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Enable Processes and Dependencies",
+      "description": "This is the flag for enabling processes and dependencies data collection in VMInsights. If you are using this standalone policy and what to install Dependency Agent, keep this value as true."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": true
+  },
+  "scopeToSupportedImages": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Scope Policy to Dependency Agent-Supported Operating Systems",
+      "description": "If set to true, the policy will apply only to virtual machines with supported operating systems. Otherwise, the policy will apply to all virtual machine resources in the assignment scope. For supported operating systems, see https://learn.microsoft.com/en-us/azure/azure-monitor/vm/vminsights-dependency-agent-maintenance"
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": true
+  }
+}

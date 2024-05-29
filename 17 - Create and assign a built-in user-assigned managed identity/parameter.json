@@ -1,0 +1,43 @@
+{
+  "bringYourOwnUserAssignedManagedIdentity": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Bring your own User-Assigned Managed Identity",
+      "description": "Enable this to use your own user-assigned managed identity. The pre-created identity MUST exist otherwise the policy deployment will fail. If enabled, ensure that the user-assigned managed identity resource ID parameter matches the pre-created user-assigned managed identity resource ID. If not enabled, the policy will create a new user-assigned managed identitiy per subscription, in a new resource group named 'Built-In-Identity-RG'."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": false
+  },
+  "userAssignedIdentityResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "User-Assigned Managed Identity Resource ID",
+      "description": "The resource ID of the pre-created user-assigned managed identity. This parameter is only used when bringYourOwnUserAssignedManagedIdentity is set to true"
+    },
+    "defaultValue": ""
+  },
+  "builtInIdentityResourceGroupLocation": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Built-In-Identity-RG Location",
+      "description": "The location of the resource group 'Built-In-Identity-RG' created by the policy."
+    },
+    "defaultValue": "eastus"
+  },
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Policy Effect",
+      "description": "The effect determines what happens when the policy rule is evaluated to match."
+    },
+    "allowedValues": [
+      "AuditIfNotExists",
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy"
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "enableProcessesAndDependencies": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Enable Processes and Dependencies",
+      "description": "This is the flag for enabling processes and dependencies data collection in VMInsights. If you are using this standalone policy and what to install Dependency Agent, keep this value as true."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": true
+  }
+}

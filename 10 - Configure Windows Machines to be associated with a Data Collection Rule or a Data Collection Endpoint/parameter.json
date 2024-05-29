@@ -1,0 +1,55 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy."
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "scopeToSupportedImages": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Scope Policy to Azure Monitor Agent-Supported Operating Systems",
+      "description": "If set to true, the policy will apply only to machines with AMA-supported operating systems. Otherwise, the policy will apply to all machines in the assignment scope. For supported operating systems, see https://aka.ms/AMAOverview."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": true
+  },
+  "listOfWindowsImageIdToInclude": {
+    "type": "Array",
+    "metadata": {
+      "displayName": "Additional Windows Machine Images",
+      "description": "List of machine images that have supported Windows OS to add to scope. Example values: '/subscriptions/<subscriptionId>/resourceGroups/YourResourceGroup/providers/Microsoft.Compute/images/ContosoStdImage'"
+    },
+    "defaultValue": []
+  },
+  "dcrResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Data Collection Rule Resource Id or Data Collection Endpoint Resource Id",
+      "description": "Resource Id of the Data Collection Rule or the Data Collection Endpoint to be applied on the Linux machines in scope.",
+      "portalReview": "true"
+    }
+  },
+  "resourceType": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Resource Type",
+      "description": "Either a Data Collection Rule (DCR) or a Data Collection Endpoint (DCE)",
+      "portalReview": "true"
+    },
+    "allowedValues": [
+      "Microsoft.Insights/dataCollectionRules",
+      "Microsoft.Insights/dataCollectionEndpoints"
+    ],
+    "defaultValue": "Microsoft.Insights/dataCollectionRules"
+  }
+}

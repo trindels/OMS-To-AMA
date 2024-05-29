@@ -1,0 +1,50 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy"
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "workspaceRegion": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Workspace region",
+      "description": "Region of the Log Analytics workspace destination for the Data Collection Rule.",
+      "strongType": "location"
+    }
+  },
+  "userWorkspaceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Workspace Id",
+      "description": "Workspace Id of the Log Analytics workspace destination for the Data Collection Rule."
+    },
+    "defaultValue": ""
+  },
+  "bringYourOwnDcr": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Bring your own DCR",
+      "description": "Enable or disable the use of a user-defined Data Collection Rule."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": false
+  },
+  "dcrResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "DCR Resource Id",
+      "description": "Resource Id of the user-defined Data Collection Rule."
+    },
+    "defaultValue": ""
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "if": {
+    "allOf": [
+      {
+        "field": "type",
+        "equals": "Microsoft.HybridCompute/machines"
+      },
+      {
+        "field": "Microsoft.HybridCompute/machines/osName",
+        "equals": "Windows"
+      },
+      {
+        "field": "Microsoft.HybridCompute/machines/mssqlDiscovered",
+        "equals": "true"
+      }
+    ]
+  },
+  "then": {
+    "effect": "[parameters('effect')]",
+    "details": {
+      "type": "Microsoft.HybridCompute/machines/extensions",
+      "name": "[concat(field('Name'), '/MicrosoftDefenderForSQL')]",
+      "evaluationDelay": "AfterProvisioning",
+      "existenceCondition": {
+        "allOf": [
+          {
+            "field": "Microsoft.HybridCompute/machines/extensions/type",
+            "equals": "AdvancedThreatProtection.Windows"
+          },
+          {
+            "field": "Microsoft.HybridCompute/machines/extensions/publisher",
+            "equals": "Microsoft.Azure.AzureDefenderForSQL"
+          },
+          {
+            "field": "Microsoft.HybridCompute/machines/extensions/provisioningState",
+            "in": [
+              "Succeeded",
+              "Provisioning succeeded"
+            ]
+          }
+        ]
+      },
+      "roleDefinitionIds": [
+        "/providers/Microsoft.Authorization/roleDefinitions/92aaf0da-9dab-42b6-94a3-d43ce8d16293"
+      ],
+      "deployment": {
+        "properties": {
+          "mode": "incremental",
+          "parameters": {
+            "location": {
+              "value": "[field('location')]"
+            },
+            "vmName": {
+              "value": "[field('Name')]"
+            }
+          },
+          "template": {
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {
+              "location": {
+                "type": "string"
+              },
+              "vmName": {
+                "type": "string"
+              }
+            },
+            "variables": {},
+            "resources": [
+              {
+                "type": "Microsoft.HybridCompute/machines/extensions",
+                "name": "[concat(parameters('vmName'), '/', 'MicrosoftDefenderForSQL')]",
+                "apiVersion": "2022-11-10",
+                "location": "[parameters('location')]",
+                "tags": {
+                  "createdBy": "MicrosoftDefenderForSQL"
+                },
+                "properties": {
+                  "publisher": "Microsoft.Azure.AzureDefenderForSQL",
+                  "type": "AdvancedThreatProtection.Windows",
+                  "typeHandlerVersion": "2.0",
+                  "autoUpgradeMinorVersion": true,
+                  "enableAutomaticUpgrade": true
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
