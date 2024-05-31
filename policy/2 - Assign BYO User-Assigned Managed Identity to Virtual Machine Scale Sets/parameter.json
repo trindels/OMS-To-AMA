@@ -1,0 +1,22 @@
+{
+  "userAssignedIdentityResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "User-Assigned Managed Identity Resource ID",
+      "description": "The resource ID of the pre-created user-assigned managed identity. This parameter is only used when the restrict Bring Your Own User-Assigned Identity To Subscription parameter is false."
+    }
+  },
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Policy Effect",
+      "description": "The effect determines what happens when the policy rule is evaluated to match."
+    },
+    "allowedValues": [
+      "AuditIfNotExists",
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  }
+}

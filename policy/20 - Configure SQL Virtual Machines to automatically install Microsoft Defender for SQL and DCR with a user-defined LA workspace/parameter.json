@@ -1,0 +1,22 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy"
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "dcrResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "DCR Resource Id",
+      "description": "Resource Id of the user-defined Data Collection Rule."
+    },
+    "defaultValue": ""
+  }
+}

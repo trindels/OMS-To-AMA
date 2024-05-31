@@ -1,0 +1,41 @@
+{
+  "effect": {
+    "type": "String",
+    "metadata": {
+      "displayName": "Effect",
+      "description": "Enable or disable the execution of the policy."
+    },
+    "allowedValues": [
+      "DeployIfNotExists",
+      "Disabled"
+    ],
+    "defaultValue": "DeployIfNotExists"
+  },
+  "userAssignedIdentityResourceId": {
+    "type": "String",
+    "metadata": {
+      "displayName": "User-Assigned Managed Identity Resource ID",
+      "description": "The resource ID of the pre-created user-assigned managed identity. This parameter is only used when the restrict Bring Your Own User-Assigned Identity To Subscription parameter is false."
+    }
+  },
+  "scopeToSupportedImages": {
+    "type": "Boolean",
+    "metadata": {
+      "displayName": "Scope Policy to Azure Monitor Agent-Supported Operating Systems",
+      "description": "If set to true, the policy will apply only to virtual machines with supported operating systems. Otherwise, the policy will apply to all virtual machine resources in the assignment scope. For supported operating systems, see https://aka.ms/AMAOverview."
+    },
+    "allowedValues": [
+      true,
+      false
+    ],
+    "defaultValue": true
+  },
+  "listOfWindowsImageIdToInclude": {
+    "type": "Array",
+    "metadata": {
+      "displayName": "Additional Virtual Machine Images",
+      "description": "List of virtual machine images that have supported Windows OS to add to scope. Example values: '/subscriptions/<subscriptionId>/resourceGroups/YourResourceGroup/providers/Microsoft.Compute/images/ContosoStdImage'"
+    },
+    "defaultValue": []
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "if": {
+    "allOf": [
+      {
+        "field": "type",
+        "equals": "Microsoft.Compute/virtualMachineScaleSets"
+      },
+      {
+        "value": "[requestContext().apiVersion]",
+        "greaterOrEquals": "2018-10-01"
+      }
+    ]
+  },
+  "then": {
+    "effect": "[parameters('effect')]",
+    "details": {
+      "type": "Microsoft.Compute/virtualMachineScaleSets",
+      "name": "[field('name')]",
+      "evaluationDelay": "AfterProvisioning",
+      "deploymentScope": "subscription",
+      "existenceCondition": {
+        "anyOf": [
+          {
+            "allOf": [
+              {
+                "field": "identity.type",
+                "contains": "UserAssigned"
+              },
+              {
+                "field": "identity.userAssignedIdentities",
+                "containsKey": "[parameters('userAssignedIdentityResourceId')]"
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "field": "identity.type",
+                "equals": "UserAssigned"
+              },
+              {
+                "value": "[string(length(field('identity.userAssignedIdentities')))]",
+                "equals": "1"
+              }
+            ]
+          }
+        ]
+      },
+      "roleDefinitionIds": [
+        "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c",
+        "/providers/Microsoft.Authorization/roleDefinitions/18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"
+      ],
+      "deployment": {
+        "location": "eastus",
+        "properties": {
+          "mode": "incremental",
+          "parameters": {
+            "userAssignedIdentityResourceId": {
+              "value": "[parameters('userAssignedIdentityResourceId')]"
+            },
+            "location": {
+              "value": "[field('location')]"
+            },
+            "vmName": {
+              "value": "[field('name')]"
+            },
+            "vmResourceGroup": {
+              "value": "[resourceGroup().name]"
+            },
+            "vmResourceId": {
+              "value": "[field('id')]"
+            }
+          },
+          "template": {
+            "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+            "contentVersion": "1.0.0.1",
+            "parameters": {
+              "bringYourOwnUserAssignedManagedIdentity": {
+                "type": "bool"
+              },
+              "restrictBringYourOwnUserAssignedIdentityToSubscription": {
+                "type": "bool"
+              },
+              "userAssignedIdentityResourceId": {
+                "type": "string"
+              },
+              "location": {
+                "type": "string"
+              },
+              "uaName": {
+                "type": "string"
+              },
+              "identityResourceGroup": {
+                "type": "string"
+              },
+              "builtInIdentityResourceGroupLocation": {
+                "type": "string"
+              },
+              "vmName": {
+                "type": "string"
+              },
+              "vmResourceGroup": {
+                "type": "string"
+              },
+              "vmResourceId": {
+                "type": "string"
+              }
+            },
+            "variables": {
+              "deployGetResourceProperties": "[concat('deployGetResourceProperties-', uniqueString(deployment().name))]",
+              "deployAssignUAName": "[concat('deployAssignUA-', uniqueString(deployment().name))]"
+            },
+            "resources": [
+              {
+                "type": "Microsoft.Resources/deployments",
+                "apiVersion": "2020-06-01",
+                "name": "[variables('deployGetResourceProperties')]",
+                "location": "[parameters('location')]",
+                "properties": {
+                  "mode": "Incremental",
+                  "template": {
+                    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [],
+                    "outputs": {
+                      "resource": {
+                        "type": "object",
+                        "value": "[reference(parameters('vmResourceId'), '2019-07-01', 'Full')]"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "Microsoft.Resources/deployments",
+                "apiVersion": "2020-06-01",
+                "name": "[concat(variables('deployAssignUAName'))]",
+                "resourceGroup": "[parameters('vmResourceGroup')]",
+                "dependsOn": [
+                  "[variables('deployGetResourceProperties')]"
+                ],
+                "properties": {
+                  "mode": "Incremental",
+                  "expressionEvaluationOptions": {
+                    "scope": "inner"
+                  },
+                  "parameters": {
+                    "uaId": {
+                      "value": "[parameters('userAssignedIdentityResourceId')]"
+                    },
+                    "vmName": {
+                      "value": "[parameters('vmName')]"
+                    },
+                    "location": {
+                      "value": "[parameters('location')]"
+                    },
+                    "identityType": {
+                      "value": "[if(contains(reference(variables('deployGetResourceProperties')).outputs.resource.value, 'identity'), reference(variables('deployGetResourceProperties')).outputs.resource.value.identity.type, '')]"
+                    },
+                    "userAssignedIdentities": {
+                      "value": "[if(and(contains(reference(variables('deployGetResourceProperties')).outputs.resource.value, 'identity'), contains(reference(variables('deployGetResourceProperties')).outputs.resource.value.identity, 'userAssignedIdentities')), reference(variables('deployGetResourceProperties')).outputs.resource.value.identity.userAssignedIdentities, createObject())]"
+                    }
+                  },
+                  "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                      "uaId": {
+                        "type": "string"
+                      },
+                      "vmName": {
+                        "type": "string"
+                      },
+                      "location": {
+                        "type": "string"
+                      },
+                      "identityType": {
+                        "type": "string"
+                      },
+                      "userAssignedIdentities": {
+                        "type": "object"
+                      }
+                    },
+                    "variables": {
+                      "identityTypeValue": "[if(contains(parameters('identityType'), 'SystemAssigned'), 'SystemAssigned,UserAssigned', 'UserAssigned')]",
+                      "userAssignedIdentitiesValue": "[union(parameters('userAssignedIdentities'), createObject(parameters('uaId'), createObject()))]",
+                      "resourceWithSingleUAI": "[and(equals(parameters('identityType'), 'UserAssigned'), equals(string(length(parameters('userAssignedIdentities'))), '1'))]"
+                    },
+                    "resources": [
+                      {
+                        "condition": "[not(variables('resourceWithSingleUAI'))]",
+                        "apiVersion": "2019-07-01",
+                        "type": "Microsoft.Compute/virtualMachineScaleSets",
+                        "name": "[parameters('vmName')]",
+                        "location": "[parameters('location')]",
+                        "identity": {
+                          "type": "[variables('identityTypeValue')]",
+                          "userAssignedIdentities": "[variables('userAssignedIdentitiesValue')]"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
