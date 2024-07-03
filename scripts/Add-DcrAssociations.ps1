@@ -13,6 +13,44 @@ param(
     $Target = 'All'
 )
 
+# Output Audit History
+function New-AuditObject
+{
+    [OutputType([PSCustomObject])]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$Action,
+        [Parameter(Mandatory = $true)]
+        [string]$SubscriptionId,
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceGroupName = "",
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceName = "",
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceType = "",
+        [Parameter(Mandatory = $true)]
+        [string]$DataCollectionRuleId,
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+        [Parameter(Mandatory = $false)]
+        [string]$Message = ""
+    )
+
+    $object = New-Object -TypeName PSObject
+    $object | Add-Member -MemberType NoteProperty -Name "Action" -Value $Action
+    $object | Add-Member -MemberType NoteProperty -Name "SubscriptionId" -Value $SubscriptionId
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceGroupName" -Value $ResourceGroupName
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceName" -Value $ResourceName
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceType" -Value $ResourceType
+    $object | Add-Member -MemberType NoteProperty -Name "DataCollectionRuleId" -Value $DataCollectionRuleId
+    $object | Add-Member -MemberType NoteProperty -Name "Status" -Value $Status
+    $object | Add-Member -MemberType NoteProperty -Name "Message" -Value $Message
+
+    return $object
+}
+$outputAudit = @()
+
 # Get the Current Powershell Context (for restoring later)
 $oldCtx = Get-AzContext -ErrorAction Stop
 
@@ -49,7 +87,7 @@ foreach ( $dcrId in $DataCollectionRuleId ) {
         $dcr = Get-AzDataCollectionRule `
             -SubscriptionId $dcrIdSplit[2] `
             -ResourceGroupName $dcrIdSplit[4] `
-            -Name $dcrIdSplit[8]
+            -Name $dcrIdSplit[8] `
             -ErrorAction SilentlyContinue
         
         if ( $null -eq $dcr ) {
@@ -59,21 +97,17 @@ foreach ( $dcrId in $DataCollectionRuleId ) {
     }
 }
 
-# Get All Available Subscriptions
-$allCtx = Get-AzContext -ListAvailable
-
 # Run Your Script
 foreach ( $subId in $SubscriptionId ) { # Loop Through Subscriptions
     # Validate Subscription Id
-    $ctx = $allCtx | Where-Object { $_.Subscription.Id -eq $subId }
-    if ( $null -ne $ctx ) {
-        Set-AzContext -Context $ctx | Out-Null
+    try {
+        $ctx = Set-AzContext -Subscription $subId -ErrorAction Stop | Out-Null
     }
-    else {
-        Write-Error "Subscription '$subId' not available"
-        break
+    catch {
+        Write-Error "Subscription: '$subId': $($_.Exception.Message)"
+        continue
     }
-
+    
     $resIds = @()
 
     if ( $Target -eq "All" -or $Target -eq "VM" ) {
@@ -97,9 +131,34 @@ foreach ( $subId in $SubscriptionId ) { # Loop Through Subscriptions
         $currentDcrs = Get-AzDataCollectionRuleAssociation -ResourceUri $res
 
         foreach ( $dcrId in $DataCollectionRuleId ) { # Loop Through DCRs
-            $assocName = "$($dcr.split("/")[-1])-association"
+            $assocName = "$($dcrId.split("/")[-1])-association"
             if ( $dcrId -notIn $currentDcrs.DataCollectionRuleId ) { # Verify
-                New-AzDataCollectionRuleAssociation -Association $assocName -ResourceUri $res -DataCollectionRuleId $dcrId
+                # Auditing
+                $audit = @{
+                    Action = "Add Data Collection Rule Association"
+                    SubscriptionId = $res.split("/")[2]
+                    ResourceGroupName = $res.split("/")[4]
+                    ResourceType = $res.split("/")[6] + "/" + $res.split("/")[7]
+                    ResourceName = $res.split("/")[8]
+                    DataCollectionRuleId = $dcrId
+                    Status = "Unchanged"
+                    Message = ""
+                }
+
+                # Update
+                try {
+                    New-AzDataCollectionRuleAssociation -Association $assocName -ResourceUri $res -DataCollectionRuleId $dcrId -ErrorAction Stop | Out-Null
+                    Write-Host "Successfully Updated Association: $resId - $dcrId"
+                    $audit.Status = "Success"                    
+                }
+                catch {
+                    Write-Error "Failed to Add Data Collection Rule Association: \n  Resource: $($resId) \n  Data Collection Rule: $($dcrId)"
+                    $audit.Status = "Failed"
+                    $audit.Message = $_.Exception.Message
+                }
+
+                # Save Audit Results
+                $outputAudit += New-AuditObject @audit
             }
         }
     }
@@ -107,3 +166,6 @@ foreach ( $subId in $SubscriptionId ) { # Loop Through Subscriptions
 
 # Set the Current Powershell Context back to the original
 Set-AzContext -Context $oldCtx | Out-Null
+
+# Return Output Audit History
+return $outputAudit

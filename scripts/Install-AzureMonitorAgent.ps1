@@ -25,6 +25,41 @@ param(
     $Target = 'All'
 )
 
+# Output Audit History
+function New-AuditObject
+{
+    [OutputType([PSCustomObject])]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$Action,
+        [Parameter(Mandatory = $true)]
+        [string]$SubscriptionId,
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceGroupName = "",
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceName = "",
+        [Parameter(Mandatory = $false)]
+        [string]$ResourceType = "",
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+        [Parameter(Mandatory = $false)]
+        [string]$Message = ""
+    )
+
+    $object = New-Object -TypeName PSObject
+    $object | Add-Member -MemberType NoteProperty -Name "Action" -Value $Action
+    $object | Add-Member -MemberType NoteProperty -Name "SubscriptionId" -Value $SubscriptionId
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceGroupName" -Value $ResourceGroupName
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceName" -Value $ResourceName
+    $object | Add-Member -MemberType NoteProperty -Name "ResourceType" -Value $ResourceType
+    $object | Add-Member -MemberType NoteProperty -Name "Status" -Value $Status
+    $object | Add-Member -MemberType NoteProperty -Name "Message" -Value $Message
+
+    return $object
+}
+$outputAudit = @()
+
 # Get the Current Powershell Context (for restoring later)
 $oldCtx = Get-AzContext -ErrorAction Stop
 
@@ -71,20 +106,15 @@ if ( $UserAssigned ) {
     }
 }
 
-# Get All Available Subscriptions
-$allCtx = Get-AzContext -ListAvailable
-
 foreach ( $subId in $SubscriptionId ) {
     # Validate Subscription Id
-    $ctx = $allCtx | Where-Object { $_.Subscription.Id -eq $subId }
-    if ( $null -ne $ctx ) {
-        Set-AzContext -Context $ctx | Out-Null
+    try {
+        $ctx = Set-AzContext -Subscription $subId -ErrorAction Stop | Out-Null
     }
-    else {
-        Write-Error "Subscription '$subId' not available"
-        break
+    catch {
+        Write-Error "Subscription: '$subId': $($_.Exception.Message)"
+        continue
     }
-
     
     if ( $Target -eq "All" -or $Target -eq "VM" ) {
         # Get all VMs
@@ -105,6 +135,18 @@ foreach ( $subId in $SubscriptionId ) {
         
         # Update Each In-Scope VM Identity
         foreach ( $vm in $allVm ) {
+            # Auditing
+            $audit = @{
+                Action = ( $SystemAssigned ? "Add AMA with System Identity" : "Add AMA with User Assigned Identity" )
+                SubscriptionId = $subId
+                ResourceGroupName = $vm.ResourceGroupName
+                ResourceType = $vm.Type
+                ResourceName = $vm.Name
+                Status = "Unchanged"
+                Message = ""
+            }
+
+            # Update
             try {
                 $agentConfig = @{
                     VMName = $vm.Name
@@ -120,11 +162,17 @@ foreach ( $subId in $SubscriptionId ) {
                     $agentConfig.Add( "SettingString", "{`"authentication`":{`"managedIdentity`":{`"identifier-name`":`"mi_res_id`",`"identifier-value`":`"$($uami.Id)`"}}}" )
                 }
                 Set-AzVMExtension @agentConfig -ErrorAction Stop | Out-Null
-                Write-Host "Successfully Updated VM: $($vm.Name)"
+                Write-Host "Successfully Updated VM Extension: $($vm.Name)"
+                $audit.Status = "Success"
             }
             catch {
-                Write-Error "Failed to Update VM Identity: $($vm.Name)"
+                Write-Error "Failed to Update VM Extension: $($vm.Name)"
+                $audit.Status = "Failed"
+                $audit.Message = $_.Exception.Message
             }
+
+            # Save Audit
+            $outputAudit += New-AuditObject @audit
         }
     }
 
@@ -147,6 +195,18 @@ foreach ( $subId in $SubscriptionId ) {
 
         # Update Each In-Scope VMSS Identity
         foreach ( $vm in $allVmss ) {
+            # Auditing
+            $audit = @{
+                Action = ( $SystemAssigned ? "Add AMA with System Identity" : "Add AMA with User Assigned Identity" )
+                SubscriptionId = $subId
+                ResourceGroupName = $vm.ResourceGroupName
+                ResourceType = $vm.Type
+                ResourceName = $vm.Name
+                Status = "Unchanged"
+                Message = ""
+            }
+
+            # Update
             try {
                 $agentConfig = @{
                     #VMName = $vm.Name
@@ -163,15 +223,70 @@ foreach ( $subId in $SubscriptionId ) {
                 }
                 $vm = $vm | Add-AzVmssExtension @agentConfig
                 $vm | Update-AzVmss -ErrorAction Stop | Out-Null
-                Write-Host "Successfully Updated VMSS Identity: $($vm.Name)"
+                Write-Host "Successfully Updated VMSS AMA Extension: $($vm.Name)"
+                $audit.Status = "Success"
             }
             catch {
-                Write-Error "Failed to Update VMSS Identity: $($vm.Name)"
-                Write-Error "$($_.Exception.Message)"
+                Write-Error "Failed to Update VMSS AMA Extension: $($vm.Name)"
+                $audit.Status = "Failed"
+                $audit.Message = $_.Exception.Message
             }
+
+            # Save Audit
+            $outputAudit += New-AuditObject @audit
+        }
+    }
+
+    if ( $Target -eq "All" -or $Target -eq "Arc" ) {
+        # Get all VM Scale Sets
+        $allArc = Get-AzConnectedMachine
+
+        # Update Each In-Scope VMSS Identity
+        foreach ( $vm in $allArc ) {
+            # Auditing
+            $audit = @{
+                Action = "Add AMA with System Identity"
+                SubscriptionId = $subId
+                ResourceGroupName = $vm.ResourceGroupName
+                ResourceType = $vm.Type
+                ResourceName = $vm.Name
+                Status = "Unchanged"
+                Message = ""
+            }
+
+            # Update
+            try {
+                $osType = $vm.OsType.substring(0,1).ToUpper() + $vm.OsType.substring(1).ToLower()
+                $agentConfig = @{
+                    MachineName = $vm.Name
+                    ResourceGroupName = $vm.ResourceGroupName
+                    Location = $vm.Location
+                    Name = "AzureMonitor$($osType)Agent"
+                    ExtensionType = "AzureMonitor$($osType)Agent"
+                    Publisher = "Microsoft.Azure.Monitor"
+                    EnableAutomaticUpgrade = $true
+                }
+                if ( $UserAssigned ) {
+                    $agentConfig.Add( "Setting", "{`"authentication`":{`"managedIdentity`":{`"identifier-name`":`"mi_res_id`",`"identifier-value`":`"$($uami.Id)`"}}}" )
+                }
+                New-AzConnectedMachineExtension @agentConfig -ErrorAction Stop | Out-Null
+                Write-Host "Successfully Updated Arc AMA Extension: $($vm.Name)"
+                $audit.Status = "Success"
+            }
+            catch {
+                Write-Error "Failed to Update Arc AMA Extension: $($vm.Name)"
+                $audit.Status = "Failed"
+                $audit.Message = $_.Exception.Message
+            }
+
+            # Save Audit
+            $outputAudit += New-AuditObject @audit
         }
     }
 }
 
 # Set the Current Powershell Context back to the original
 Set-AzContext -Context $oldCtx | Out-Null
+
+# Return Output Audit History
+return $outputAudit
