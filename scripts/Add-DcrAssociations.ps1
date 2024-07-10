@@ -8,6 +8,11 @@ param(
     $SubscriptionId = $null,
 
     [Parameter(Mandatory=$false)]
+    [ValidateSet('Windows', 'Linux')]
+    [string]
+    $OSFilter = $null,
+
+    [Parameter(Mandatory=$false)]
     [ValidateSet('All', 'VM', 'VMSS', 'Arc')]
     [string]
     $Target = 'All'
@@ -113,16 +118,25 @@ foreach ( $subId in $SubscriptionId ) { # Loop Through Subscriptions
     if ( $Target -eq "All" -or $Target -eq "VM" ) {
         # Get Your VMs in the current Subscription
         $vms = Get-AzVM -ErrorAction SilentlyContinue
+        if ( $null -ne $OSFilter ) {
+            $vms = $vms | Where-Object { $_.StorageProfile.OsDisk.OsType -ieq $OSFilter }
+        }
         $resIds += $vms.Id
     }
     if ( $Target -eq "All" -or $Target -eq "VMSS" ) {
         # Get Your VMs in the current Subscription
-        $vms = Get-AzVmss -ErrorAction SilentlyContinue
+        $vms = Get-AzVmss -ErrorAction SilentlyContinue.
+        if ( $null -ne $OSFilter ) {
+            $vms = $vms | Where-Object { $_.VirtualMachineProfile.StorageProfile.OsDisk.OsType -ieq $OSFilter }
+        }
         $resIds += $vms.Id
     }
     if ( $Target -eq "All" -or $Target -eq "Arc" ) {
         # Get Your VMs in the current Subscription
         $vms = Get-AzConnectedMachine -ErrorAction SilentlyContinue
+        if ( $null -ne $OSFilter ) {
+            $vms = $vms | Where-Object { $_.OSType -ieq $OSFilter }
+        }
         $resIds += $vms.Id
     }
 
