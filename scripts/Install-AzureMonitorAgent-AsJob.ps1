@@ -297,7 +297,7 @@ Set-AzContext -Context $oldCtx | Out-Null
 
 #$outputAudit | ft ResourceName, Status, Job
 if( ($outputAudit | Where-Object { $_.Status -eq "Pending" }).Count -gt 0 ) {
-    Write-Host "Waiting." -NoNewline
+    Write-Host "Waiting for Jobs." -NoNewline
     do {
         # Wait for 60 seconds
         Start-Sleep -Seconds 60
