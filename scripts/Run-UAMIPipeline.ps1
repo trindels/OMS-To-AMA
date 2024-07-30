@@ -17,13 +17,13 @@ $dcrs = @(
 $uami = Get-AzUserAssignedIdentity -SubscriptionId $uamiSubId -ResourceGroupName $uamiRgName -Name $uamiName -ErrorAction Stop
 
 # Add Managed Identity to VMs in Scope
-.\Add-ManagedIdentity.ps1 -UserAssigned -IdentityId $uami.Id -SubscriptionId $subs -Target VM -OutVariable $miAudit
-Export-Csv -Path "ManagedIdentityAudit.csv" -InputObject $miAudit -NoTypeInformation -NoClobber
+$miAudit = .\Add-ManagedIdentity.ps1 -UserAssigned -IdentityId $uami.Id -SubscriptionId $subs -Target VM
+$miAudit | Export-Csv -Path "ManagedIdentityAudit.csv" -NoTypeInformation -NoClobber
 
 # Install Azure Monitor Agent to In Scope VMs
-.\Install-AzureMonitorAgent.ps1 -UserAssigned -IdentityId $uami.Id -SubscriptionId $subs -Target VM -OutVariable $amaAudit
-Export-Csv -Path "AmaAudit.csv" -InputObject $amaAudit -NoTypeInformation -NoClobber
+$amaAudit = .\Install-AzureMonitorAgent.ps1 -UserAssigned -IdentityId $uami.Id -SubscriptionId $subs -Target VM
+$amaAudit | Export-Csv -Path "AmaAudit.csv" -NoTypeInformation -NoClobber
 
 # Add Data Collection Rule Associations to In Scope VMs
-.\Add-DcrAssociations.ps1 -DataCollectionRuleId $dcrs -SubscriptionId $subs -Target VM -OutVariable $dcrAudit
-Export-Csv -Path "DcrAudit.csv" -InputObject $dcrAudit -NoTypeInformation -NoClobber
+$dcrAudit = .\Add-DcrAssociations.ps1 -DataCollectionRuleId $dcrs -SubscriptionId $subs -Target VM
+$dcrAudit | Export-Csv -Path "DcrAudit.csv" -NoTypeInformation -NoClobber

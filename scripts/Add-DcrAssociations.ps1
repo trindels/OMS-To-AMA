@@ -162,11 +162,11 @@ foreach ( $subId in $SubscriptionId ) { # Loop Through Subscriptions
                 # Update
                 try {
                     New-AzDataCollectionRuleAssociation -Association $assocName -ResourceUri $res -DataCollectionRuleId $dcrId -ErrorAction Stop | Out-Null
-                    Write-Host "Successfully Updated Association: $resId - $dcrId"
+                    Write-Host "Successfully Updated Association: $res - $dcrId"
                     $audit.Status = "Success"                    
                 }
                 catch {
-                    Write-Error "Failed to Add Data Collection Rule Association: \n  Resource: $($resId) \n  Data Collection Rule: $($dcrId)"
+                    Write-Error "Failed to Add Data Collection Rule Association: \n  Resource: $($res) \n  Data Collection Rule: $($dcrId)"
                     $audit.Status = "Failed"
                     $audit.Message = $_.Exception.Message
                 }

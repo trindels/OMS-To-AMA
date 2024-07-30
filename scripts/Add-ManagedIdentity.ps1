@@ -75,7 +75,7 @@ if ( $null -eq $SubscriptionId -or $SubscriptionId -eq "" ) {
 }
 
 # Validate Identity Id
-if ( $UserAssigned ) {
+if ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
     $identityIdSplit = $IdentityId.Split("/")
 
     # Validate Identity Id
@@ -121,10 +121,10 @@ foreach ( $subId in $SubscriptionId ) {
         $allVm = Get-AzVM
 
         # Filter Out of Scope VMs
-        if ( $SystemAssigned ) {
+        if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
             $allVm = $allVm | Where-Object { $_.Identity.Type -notlike 'SystemAssigned*' }
         }
-        elseif ( $UserAssigned ) {
+        elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
             $allVm = $allVm | Where-Object { $_.Identity.Type -notlike '*UserAssigned' -or $_.Identity.UserAssignedIdentities.Keys -notcontains $IdentityId }
         }
         $allVm = $allVm | Where-Object { $_.VirtualMachineProfile.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames }
@@ -132,8 +132,10 @@ foreach ( $subId in $SubscriptionId ) {
         # Update Each In-Scope VM Identity
         foreach ( $vm in $allVm ) {
             # Auditing
+            $action = "Add User Assigned Identity"
+            if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) { $action = "Add System Assigned Identity" }
             $audit = @{
-                Action = ( $SystemAssigned ? "Add System Assigned Identity" : "Add User Assigned Identity" )
+                Action = $action
                 SubscriptionId = $subId
                 ResourceGroupName = $vm.ResourceGroupName
                 ResourceType = $vm.Type
@@ -144,7 +146,7 @@ foreach ( $subId in $SubscriptionId ) {
 
             # Updating
             try {
-                if ( $SystemAssigned ) {
+                if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
                     if ( $null -eq $vm.Identity -or $vm.Identity.Type -eq "None" ) {
                         $vm | Update-AzVM -IdentityType SystemAssigned -ErrorAction Stop | Out-Null
                     }
@@ -152,8 +154,9 @@ foreach ( $subId in $SubscriptionId ) {
                         $vm | Update-AzVM -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -ErrorAction Stop | Out-Null
                     }
                 }
-                elseif ( $UserAssigned ) {
-                    $idType = $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ? "SystemAssignedUserAssigned" : "UserAssigned"
+                elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+                    $idType = "UserAssigned"
+                    if ( $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ) { $idType = "SystemAssignedUserAssigned" }
                     $ids = $vm.Identity.UserAssignedIdentities.Keys + $uami.Id
                     $vm | Update-AzVM -IdentityType $idType -IdentityId @( $ids ) -ErrorAction Stop | Out-Null
                 }
@@ -176,10 +179,10 @@ foreach ( $subId in $SubscriptionId ) {
         $allVmss = Get-AzVmss
 
         # Filter Out of Scope VMSS
-        if ( $SystemAssigned ) {
+        if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
             $allVmss = $allVmss | Where-Object { $_.Identity.Type -notlike '*SystemAssigned*' }
         }
-        elseif ( $UserAssigned ) {
+        elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
             $allVmss = $allVmss | Where-Object { $_.Identity.Type -notlike '*UserAssigned*' -or $_.Identity.UserAssignedIdentities.Keys -notcontains $IdentityId }
         }
         $allVmss = $allVmss | Where-Object { $_.VirtualMachineProfile.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames }
@@ -187,8 +190,10 @@ foreach ( $subId in $SubscriptionId ) {
         # Update Each In-Scope VMSS Identity
         foreach ( $vm in $allVmss ) {
             # Audit
+            $action = "Add User Assigned Identity"
+            if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) { $action = "Add System Assigned Identity" }
             $audit = @{
-                Action = ( $SystemAssigned ? "Add System Assigned Identity" : "Add User Assigned Identity" )
+                Action = $action
                 SubscriptionId = $subId
                 ResourceGroupName = $vm.ResourceGroupName
                 ResourceType = $vm.Type
@@ -199,7 +204,7 @@ foreach ( $subId in $SubscriptionId ) {
 
             #Update
             try {
-                if ( $SystemAssigned ) {
+                if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
                     if ( $null -eq $vm.Identity -or $vm.Identity.Type -eq "None" ) {
                         $vm | Update-AzVmss -IdentityType SystemAssigned -ErrorAction Stop | Out-Null
                     }
@@ -207,8 +212,9 @@ foreach ( $subId in $SubscriptionId ) {
                         $vm | Update-AzVmss -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -ErrorAction Stop | Out-Null
                     }
                 }
-                elseif ( $UserAssigned ) {
-                    $idType = $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ? "SystemAssignedUserAssigned" : "UserAssigned"
+                elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+                    $idType = "UserAssigned"
+                    if ( $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ) { $idType = "SystemAssignedUserAssigned" }
                     $ids = $vm.Identity.UserAssignedIdentities.Keys + $uami.Id
                     $vm | Update-AzVmss -IdentityType $idType -IdentityId @( $ids ) -ErrorAction Stop | Out-Null
                 }
