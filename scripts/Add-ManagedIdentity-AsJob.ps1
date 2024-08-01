@@ -20,7 +20,7 @@ param(
     $IgnoreImageNames = @(),
 
     [Parameter(Mandatory=$false)]
-    [ValidateSet('All', 'VM', 'VMSS', 'Arc')]
+    [ValidateSet('All', 'VM', 'VMSS')]
     [string]
     $Target = 'All'
 )
@@ -75,7 +75,7 @@ if ( $null -eq $SubscriptionId -or $SubscriptionId -eq "" ) {
 }
 
 # Validate Identity Id
-if ( $UserAssigned ) {
+if ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
     $identityIdSplit = $IdentityId.Split("/")
 
     # Validate Identity Id
@@ -118,26 +118,24 @@ foreach ( $subId in $SubscriptionId ) {
     
     if ( $Target -eq "All" -or $Target -eq "VM" ) {
         # Get all VMs
-        $allVm = Get-AzVM -Status
+        $allVm = Get-AzVM
 
         # Filter Out of Scope VMs
-        # Identity Configuration Not Prepared
-        if ( $SystemAssigned ) {
-            $allVm = $allVm | Where-Object { $_.Identity.Type -like '*SystemAssigned*' }
+        if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
+            $allVm = $allVm | Where-Object { $_.Identity.Type -notlike 'SystemAssigned*' }
         }
-        elseif ( $UserAssigned ) {
-            $allVm = $allVm | Where-Object { $_.Identity.Type -like '*UserAssigned*' -or $_.Identity.UserAssignedIdentities.Keys -contains $IdentityId } 
+        elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+            $allVm = $allVm | Where-Object { $_.Identity.Type -notlike '*UserAssigned' -or $_.Identity.UserAssignedIdentities.Keys -notcontains $IdentityId }
         }
-        # Unsupported Images
-        $allVm = $allVm | Where-Object { $_.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames } 
-        # Agent Already Installed
-        $allVm = $allVm | Where-Object { "$($_.Id)/extensions/AzureMonitor$($_.StorageProfile.OsDisk.OsType)Agent" -notin $_.Extensions.Id } 
+        $allVm = $allVm | Where-Object { $_.VirtualMachineProfile.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames }
         
         # Update Each In-Scope VM Identity
         foreach ( $vm in $allVm ) {
             # Auditing
+            $action = "Add User Assigned Identity"
+            if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) { $action = "Add System Assigned Identity" }
             $audit = @{
-                Action = ( $SystemAssigned ? "Add AMA with System Identity" : "Add AMA with User Assigned Identity" )
+                Action = $action
                 SubscriptionId = $subId
                 ResourceGroupName = $vm.ResourceGroupName
                 ResourceType = $vm.Type
@@ -146,34 +144,28 @@ foreach ( $subId in $SubscriptionId ) {
                 Message = ""
             }
 
-            # Update
+            # Updating
             try {
-                if ( $vm.PowerState -eq "VM running" ) {
-                    $agentConfig = @{
-                        VMName = $vm.Name
-                        ResourceGroupName = $vm.ResourceGroupName
-                        Location = $vm.Location
-                        Name = "AzureMonitor$($vm.StorageProfile.OsDisk.OsType)Agent"
-                        ExtensionType = "AzureMonitor$($vm.StorageProfile.OsDisk.OsType)Agent"
-                        Publisher = "Microsoft.Azure.Monitor"
-                        TypeHandlerVersion = "1.2"
-                        EnableAutomaticUpgrade = $true
+                if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
+                    if ( $null -eq $vm.Identity -or $vm.Identity.Type -eq "None" ) {
+                        $job = Update-AzVM -VM $vm -IdentityType SystemAssigned -AsJob -ErrorAction Stop
                     }
-                    if ( $UserAssigned ) {
-                        $agentConfig.Add( "SettingString", "{`"authentication`":{`"managedIdentity`":{`"identifier-name`":`"mi_res_id`",`"identifier-value`":`"$($uami.Id)`"}}}" )
+                    else {
+                        $job = Update-AzVM -VM $vm -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -AsJob -ErrorAction Stop
                     }
-                    $job = Set-AzVMExtension @agentConfig -AsJob -ErrorAction Stop
-                    Write-Host "Started Updating VM Extension: $($vm.Name)"
-                    $audit.Status = "Pending"
-                    $audit.Message = $job.Id
-                } else {
-                    Write-Host "Skipping VM Extension Update: $($vm.Name) (Offline)"
-                    $audit.Status = "Skipped"
-                    $audit.Message = "VM is Offline"
                 }
+                elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+                    $idType = "UserAssigned"
+                    if ( $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ) { $idType = "SystemAssignedUserAssigned" }
+                    $ids = $vm.Identity.UserAssignedIdentities.Keys + $uami.Id
+                    $job = Update-AzVM -VM $vm -IdentityType $idType -IdentityId @( $ids ) -AsJob -ErrorAction Stop
+                }
+                Write-Host "Started Updated VM Identity: $($vm.Name)"
+                $audit.Status = "Pending"
+                $audit.Message = "$($job.Id)"
             }
             catch {
-                Write-Error "Failed to Update VM Extension: $($vm.Name)"
+                Write-Error "Failed to Update VM Identity: $($vm.Name)"
                 $audit.Status = "Failed"
                 $audit.Message = $_.Exception.Message
             }
@@ -188,23 +180,21 @@ foreach ( $subId in $SubscriptionId ) {
         $allVmss = Get-AzVmss
 
         # Filter Out of Scope VMSS
-        # Identity Configuration Not Prepared
-        if ( $SystemAssigned ) {
-            $allVmss = $allVmss | Where-Object { $_.Identity.Type -like '*SystemAssigned*' }
+        if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
+            $allVmss = $allVmss | Where-Object { $_.Identity.Type -notlike '*SystemAssigned*' }
         }
-        elseif ( $UserAssigned ) {
-            $allVmss = $allVmss | Where-Object { $_.Identity.Type -like '*UserAssigned*' -and $_.Identity.UserAssignedIdentities.Keys -contains $IdentityId }
+        elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+            $allVmss = $allVmss | Where-Object { $_.Identity.Type -notlike '*UserAssigned*' -or $_.Identity.UserAssignedIdentities.Keys -notcontains $IdentityId }
         }
-        # Unsupported Images
-        $allVmss = $allVmss | Where-Object { $_.VirtualMachineProfile.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames } 
-        # Agent Already Installed
-        $allVmss = $allVmss | Where-Object { "AzureMonitor$($_.VirtualMachineProfile.StorageProfile.OsDisk.OsType)Agent" -notin $_.VirtualMachineProfile.ExtensionProfile.Extensions.Name } 
-
+        $allVmss = $allVmss | Where-Object { $_.VirtualMachineProfile.StorageProfile.ImageReference.Offer -notin $IgnoreImageNames }
+        
         # Update Each In-Scope VMSS Identity
         foreach ( $vm in $allVmss ) {
-            # Auditing
+            # Audit
+            $action = "Add User Assigned Identity"
+            if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) { $action = "Add System Assigned Identity" }
             $audit = @{
-                Action = ( $SystemAssigned ? "Add AMA with System Identity" : "Add AMA with User Assigned Identity" )
+                Action = $action
                 SubscriptionId = $subId
                 ResourceGroupName = $vm.ResourceGroupName
                 ResourceType = $vm.Type
@@ -213,77 +203,28 @@ foreach ( $subId in $SubscriptionId ) {
                 Message = ""
             }
 
-            # Update
+            #Update
             try {
-                $agentConfig = @{
-                    #VMName = $vm.Name
-                    #ResourceGroupName = $vm.ResourceGroupName
-                    #Location = $vm.Location
-                    Name = "AzureMonitor$($vm.VirtualMachineProfile.StorageProfile.OsDisk.OsType)Agent"
-                    Type = "AzureMonitor$($vm.VirtualMachineProfile.StorageProfile.OsDisk.OsType)Agent"
-                    Publisher = "Microsoft.Azure.Monitor"
-                    TypeHandlerVersion = "1.2"
-                    EnableAutomaticUpgrade = $true
+                if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
+                    if ( $null -eq $vm.Identity -or $vm.Identity.Type -eq "None" ) {
+                        $job = Update-AzVmss -VirtualMachineScaleSet $vm -IdentityType SystemAssigned -AsJob -ErrorAction Stop
+                    }
+                    else {
+                        $job = Update-AzVmss -VirtualMachineScaleSet $vm -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -AsJob -ErrorAction Stop
+                    }
                 }
-                if ( $UserAssigned ) {
-                    $agentConfig.Add( "Setting", "{`"authentication`":{`"managedIdentity`":{`"identifier-name`":`"mi_res_id`",`"identifier-value`":`"$($uami.Id)`"}}}" )
+                elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
+                    $idType = "UserAssigned"
+                    if ( $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ) { $idType = "SystemAssignedUserAssigned" }
+                    $ids = $vm.Identity.UserAssignedIdentities.Keys + $uami.Id
+                    $job = Update-AzVmss -VirtualMachineScaleSet $vm -IdentityType $idType -IdentityId @( $ids ) -AsJob -ErrorAction Stop
                 }
-                $vm = $vm | Add-AzVmssExtension @agentConfig
-                $job = Update-AzVmss -VirtualMachineScaleSet $vm -AsJob -ErrorAction Stop
-                Write-Host "Started Updating VMSS AMA Extension: $($vm.Name)"
+                Write-Host "Started Updating VMSS Identity: $($vm.Name)"
                 $audit.Status = "Pending"
                 $audit.Message = "$($job.Id)"
             }
             catch {
-                Write-Error "Failed to Update VMSS AMA Extension: $($vm.Name)"
-                $audit.Status = "Failed"
-                $audit.Message = $_.Exception.Message
-            }
-
-            # Save Audit
-            $outputAudit += New-AuditObject @audit
-        }
-    }
-
-    if ( $Target -eq "All" -or $Target -eq "Arc" ) {
-        # Get all VM Scale Sets
-        $allArc = Get-AzConnectedMachine
-
-        # Update Each In-Scope VMSS Identity
-        foreach ( $vm in $allArc ) {
-            # Auditing
-            $audit = @{
-                Action = "Add AMA with System Identity"
-                SubscriptionId = $subId
-                ResourceGroupName = $vm.ResourceGroupName
-                ResourceType = $vm.Type
-                ResourceName = $vm.Name
-                Status = "Unchanged"
-                Message = ""
-            }
-
-            # Update
-            try {
-                $osType = $vm.OsType.substring(0,1).ToUpper() + $vm.OsType.substring(1).ToLower()
-                $agentConfig = @{
-                    MachineName = $vm.Name
-                    ResourceGroupName = $vm.ResourceGroupName
-                    Location = $vm.Location
-                    Name = "AzureMonitor$($osType)Agent"
-                    ExtensionType = "AzureMonitor$($osType)Agent"
-                    Publisher = "Microsoft.Azure.Monitor"
-                    EnableAutomaticUpgrade = $true
-                }
-                if ( $UserAssigned ) {
-                    $agentConfig.Add( "Setting", "{`"authentication`":{`"managedIdentity`":{`"identifier-name`":`"mi_res_id`",`"identifier-value`":`"$($uami.Id)`"}}}" )
-                }
-                $job = New-AzConnectedMachineExtension @agentConfig -AsJob -ErrorAction Stop
-                Write-Host "Started Updating Arc AMA Extension: $($vm.Name)"
-                $audit.Status = "Pending"
-                $audit.Message = "$($job.Id)"
-            }
-            catch {
-                Write-Error "Failed to Update Arc AMA Extension: $($vm.Name)"
+                Write-Error "Failed to Update VMSS Identity: $($vm.Name)"
                 $audit.Status = "Failed"
                 $audit.Message = $_.Exception.Message
             }
@@ -300,7 +241,7 @@ Set-AzContext -Context $oldCtx | Out-Null
 # Pending Job Status Check
 $jobsRemaining = $outputAudit | Where-Object { $_.Status -eq "Pending" }
 Write-Host "Check Pending Jobs." -NoNewline
-while( $jobsRemaining.Count -gt 0 ) {
+while ( $jobsRemaining.Count -gt 0 ) {
     # Wait for 60 seconds
     Start-Sleep -Seconds 60
     Write-Host "." -NoNewline
@@ -319,7 +260,7 @@ while( $jobsRemaining.Count -gt 0 ) {
     
     # Are their remaining jobs?
     $jobsRemaining = $outputAudit | Where-Object { $_.Status -eq "Pending" }
-}
+} 
 Write-Host "Complete!"
 
 # Return Output Audit History
