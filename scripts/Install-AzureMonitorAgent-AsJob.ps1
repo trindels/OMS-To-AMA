@@ -109,7 +109,7 @@ if ( $UserAssigned ) {
 foreach ( $subId in $SubscriptionId ) {
     # Validate Subscription Id
     try {
-        $ctx = Set-AzContext -Subscription $subId -ErrorAction Stop | Out-Null
+        Set-AzContext -Subscription $subId -ErrorAction Stop | Out-Null
     }
     catch {
         Write-Error "Subscription: '$subId': $($_.Exception.Message)"

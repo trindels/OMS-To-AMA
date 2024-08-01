@@ -1,0 +1,39 @@
+// Machines Where System Assigned Was Removed
+resourcechanges
+| where type == 'microsoft.resources/changes'
+| where id has '/microsoft.compute/virtualmachines'
+| where not( isnull( properties.changes['identity.type'] ) )
+| extend identityType = properties.changes['identity.type']
+| extend vmName = split(id,'/')[8]
+| extend previousValue = identityType.previousValue
+| extend newValue = identityType.newValue
+| extend oldPrincipalId = tostring( properties.changes['identity.principalId'].previousValue )
+| where oldPrincipalId != ''
+| extend timestamp = todatetime(properties.changeAttributes.timestamp)
+| where timestamp >= ago( 72h )
+| project removeTimestamp = timestamp, targetResourceId = tostring(properties.targetResourceId), subscriptionId, resourceGroup, vmName, properties, oldPrincipalId, previousValue, newValue
+| join kind=leftouter ( 
+    resourcechanges
+    | where type == 'microsoft.resources/changes'
+    | where id has '/microsoft.compute/virtualmachines'
+    | where not( isnull( properties.changes['identity.type'] ) )
+    | extend identityType = properties.changes['identity.type']
+    | extend vmName = split(id,'/')[8]
+    | extend previousValue = identityType.previousValue
+    | extend newValue = identityType.newValue
+    | extend newPrincipalId = tostring( properties.changes['identity.principalId'].newValue )
+    | where newPrincipalId != ''
+    | extend timestamp = todatetime(properties.changeAttributes.timestamp)
+    | where timestamp >= ago( 72h )
+    | project addTimestamp = timestamp, targetResourceId = tostring(properties.targetResourceId), subscriptionId, resourceGroup, vmName, properties, newPrincipalId, previousValue, newValue
+) on targetResourceId
+| project removeTimestamp, addTimestamp, targetResourceId, subscriptionId, resourceGroup, vmName, oldPrincipalId, newPrincipalId
+| order by ['removeTimestamp'] desc
+| join kind=leftouter (
+    authorizationresources
+    | where type == 'microsoft.authorization/roleassignments'
+    | extend scope = properties.scope
+    | extend principalId = tostring(properties.principalId)
+    | extend roleDefinitionId = properties.roleDefinitionId
+    | project scope, principalId, roleDefinitionId
+) on $left.oldPrincipalId == $right.principalId
