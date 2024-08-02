@@ -97,6 +97,7 @@ foreach ( $subId in $SubscriptionId ) {
                     | Where-Object { $_.ExtensionType -in @("MicrosoftMonitoringAgent", "OmsAgentForLinux") }
                 if ( $vmExt.Count -eq 0 ) {
                     $audit.Message = "No Extensions to Remove."
+                    continue
                 }  
                 elseif ( $vm.PowerState -eq "VM running" ) {
                     $job = $vmExt | Remove-AzVMExtension -Force -AsJob -ErrorAction Stop
