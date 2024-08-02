@@ -72,10 +72,10 @@ foreach ( $subId in $SubscriptionId ) {
         # Get all VMs
         $allVm = Get-AzVM -Status
 
-        $allVm = $allVm | Where-Object { `
-            "$($_.Id)/extensions/MicrosoftMonitoringAgent" -in $_.Extensions.Id `
-            -or "$($_.Id)/extensions/OmsAgentForLinux" -in $_.Extensions.Id `
-        }
+        # $allVm = $allVm | Where-Object { `
+        #     "$($_.Id)/extensions/MicrosoftMonitoringAgent" -in $_.Extensions.Id `
+        #     -or "$($_.Id)/extensions/OmsAgentForLinux" -in $_.Extensions.Id `
+        # }
         
         # Update Each In-Scope VM Identity
         foreach ( $vm in $allVm ) {
@@ -90,20 +90,19 @@ foreach ( $subId in $SubscriptionId ) {
                 Message = ""
             }
 
+
             # Update
             try {
-                if ( $vm.PowerState -eq "VM running" ) {
-                    if ( $vm.StorageProfile.OsDisk.OsType -eq "Linux" ) {
-                        $agentName = "OmsAgentForLinux"
-                    } elseif ( $vm.StorageProfile.OsDisk.OsType -eq "Windows" ) {
-                        $agentName = "MicrosoftMonitoringAgent"
-                    } else {
-                        $agentName = ""
-                    }
-                    $job = Remove-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -Name $agentName -AsJob -ErrorAction Stop -Force
+                $vmExt = Get-AzVmExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name `
+                    | Where-Object { $_.ExtensionType -in @("MicrosoftMonitoringAgent", "OmsAgentForLinux") }
+                if ( $vmExt.Count -eq 0 ) {
+                    $audit.Message = "No Extensions to Remove."
+                }  
+                elseif ( $vm.PowerState -eq "VM running" ) {
+                    $job = $vmExt | Remove-AzVMExtension -Force -AsJob -ErrorAction Stop
                     Write-Host "Removing OMS/MMA VM Extension: $($vm.Name)"
                     $audit.Status = "Pending"
-                    $audit.Message = $job.Id
+                    $audit.Message = "$($job.Id)"
                 } else {
                     Write-Host "Skipping OMS/MMA VM Extension Removal: $($vm.Name) (Offline)"
                     $audit.Status = "Skipped"
