@@ -191,7 +191,7 @@ while( $jobsRemaining.Count -gt 0 ) {
             $j.Message = ""
         } elseif ( $job.State -notin @("NotStarted", "Running", "Completed") ) {
             $j.Status = "Failed"
-            $j.Message = "$($job.StatusMessage)\n$($job.Debug)"
+            $j.Message = "$($job.StatusMessage)\nDebug: $($job.Debug)\nError: $($job.Error)"
         }
     }
     
