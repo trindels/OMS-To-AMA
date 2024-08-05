@@ -100,7 +100,7 @@ foreach ( $subId in $SubscriptionId ) {
                     continue
                 }  
                 elseif ( $vm.PowerState -eq "VM running" ) {
-                    $job = $vmExt | Remove-AzVMExtension -Force -AsJob -ErrorAction Stop
+                    $job = $vmExt | Remove-AzVMExtension -Confirm:$false -Force -AsJob -ErrorAction Stop
                     Write-Host "Removing OMS/MMA VM Extension: $($vm.Name)"
                     $audit.Status = "Pending"
                     $audit.Message = "$($job.Id)"
@@ -154,7 +154,7 @@ foreach ( $subId in $SubscriptionId ) {
                     $agentName = ""
                 }
 
-                $vm = $vm | Remove-AzVmssExtension -Name $agentName -ErrorAction Stop
+                $vm = $vm | Remove-AzVmssExtension -Name $agentName -Confirm:$false -Force -ErrorAction Stop
                 $job = Update-AzVmss -VirtualMachineScaleSet $vm -AsJob -ErrorAction Stop
                 Write-Host "Removing OMS/MMA VMSS Extension: $($vm.Name)"
                 $audit.Status = "Pending"
