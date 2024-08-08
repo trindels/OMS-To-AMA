@@ -148,17 +148,17 @@ foreach ( $subId in $SubscriptionId ) {
             try {
                 if ( $null -ne $SystemAssigned -and $SystemAssigned -eq $true ) {
                     if ( $null -eq $vm.Identity -or $vm.Identity.Type -eq "None" ) {
-                        $job = Update-AzVM -VM $vm -IdentityType SystemAssigned -AsJob -ErrorAction Stop
+                        $job = $vm | Update-AzVM -IdentityType SystemAssigned -AsJob -ErrorAction Stop
                     }
                     else {
-                        $job = Update-AzVM -VM $vm -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -AsJob -ErrorAction Stop
+                        $job = $vm | Update-AzVM -IdentityType SystemAssignedUserAssigned -IdentityId @( $vm.Identity.UserAssignedIdentities.Keys ) -AsJob -ErrorAction Stop
                     }
                 }
                 elseif ( $null -ne $UserAssigned -and $UserAssigned -eq $true ) {
                     $idType = "UserAssigned"
                     if ( $null -ne $vm.Identity -and $vm.Identity.Type -like "*SystemAssigned*" ) { $idType = "SystemAssignedUserAssigned" }
                     $ids = $vm.Identity.UserAssignedIdentities.Keys + $uami.Id
-                    $job = Update-AzVM -VM $vm -IdentityType $idType -IdentityId @( $ids ) -AsJob -ErrorAction Stop
+                    $job = $vm | Update-AzVM -IdentityType $idType -IdentityId @( $ids ) -AsJob -ErrorAction Stop
                 }
                 Write-Host "Started Updated VM Identity: $($vm.Name)"
                 $audit.Status = "Pending"
