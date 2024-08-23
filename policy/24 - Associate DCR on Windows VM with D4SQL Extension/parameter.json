@@ -1,0 +1,23 @@
+{
+    "effect": {
+        "type": "String",
+        "metadata": {
+            "displayName": "Effect",
+            "description": "Enable or disable the execution of the policy."
+        },
+        "allowedValues": [
+            "DeployIfNotExists",
+            "AuditIfNotExists",
+            "Disabled"
+        ],
+        "defaultValue": "DeployIfNotExists"
+    },
+    "dcrResourceId": {
+        "type": "String",
+        "metadata": {
+            "displayName": "Data Collection Rule Resource Id",
+            "description": "Resource Id of the Data Collection Rule to be applied on the Windows VMs with D4SQL Extension installed in scope.",
+            "portalReview": "true"
+        }
+    }
+}
