@@ -1,4 +1,4 @@
-# OMS-To-AMA - Basic Process
+# OMS-To-AMA - Manual Process
 1. Determine Workspaces where Logs are currently collected
 2. Create Data Collection Rules
 3. Establish Identity to Leverage
@@ -16,7 +16,7 @@
     - Azure Virtual Machines
     - Non-Azure Servers
 
-# Defender for SQL - Basic Process
+# Defender for SQL - Manual Process
 1. Enable Auto Detection for SQL IaaS Extension Installation
 2. Determine Workspace(s) where Logs will be collected
 3. Determine List of SQL Servers in Scope
