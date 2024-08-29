@@ -111,7 +111,7 @@ Azure Monitor Agent service.
 
 ```powershell
 # Get VMs from ARG Query - (Optional) Filter Your List of VMs
-$vmsWithSql = $argResults # | Where-Object { $_.subscriptionId -in $subscriptionIds }
+$vmsWithSql = $argResults | Where-Object { $_.subscriptionId -in $subscriptionIds }
 
 # Create a Subscription Scope (for efficient loop control)
 $agentSubScope = $vmsWithSql | Select-Object subscriptionId -Unique
