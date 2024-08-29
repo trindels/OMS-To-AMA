@@ -82,7 +82,24 @@ $argQuery = @"
 Once you have determined your ARG Query scope, run this command to execute your query:
 ```powershell
 # Execute Azure Resource Graph Query
-$argResults = Search-AzGraph -UseTenantScope -Query $argQuery
+[System.Collections.Generic.List[PSCustomObject]]$argResults = @()
+$graphParam = @{
+    "UseTenantScope" = $true
+    "Query" = $argQuery
+    "First" = 100
+}    
+
+do {
+    $results = Search-AzGraph @graphParam
+    $argResults += $results.data
+          
+    if ( $null -ne $results.SkipToken ) {
+        if ( $null -eq $graphParam.SkipToken ) {
+            $graphParam.Add( "SkipToken", $null )
+        }
+        $graphParam.SkipToken = $results.SkipToken
+    }
+} while( $null -ne $results.SkipToken )
 ```
 
 ## 3. (If Not Completed) Deploy Azure Monitor Agent to Servers
@@ -94,7 +111,7 @@ Azure Monitor Agent service.
 
 ```powershell
 # Get VMs from ARG Query - (Optional) Filter Your List of VMs
-$vmsWithSql = $argResults # | Where-Object { $_.subscriptionId -notIn $subscriptionIds }
+$vmsWithSql = $argResults # | Where-Object { $_.subscriptionId -in $subscriptionIds }
 
 # Create a Subscription Scope (for efficient loop control)
 $agentSubScope = $vmsWithSql | Select-Object subscriptionId -Unique
@@ -194,14 +211,14 @@ $dcrDataFlow = New-AzDataFlowObject `
 # Create D4SQL Data Collection Rule
 try {
     $d4sqlDcr = New-AzDataCollectionRule `
-        -SubscriptionId = $dcrSubId `
-        -ResourceGroupName = $dcrRgName `
-        -Name = $dcrName `
-        -Location = $dcrLocation `
-        -DataSourceExtension = @( $dcrDataSource ) `
-        -DestinationLogAnalytic = @( $dcrDestination ) `
-        -DataFlow = @( $dcrDataFlow ) `
-        -Tag = @{ "createdBy" = "MicrosoftDefenderForSQL" } `
+        -SubscriptionId $dcrSubId `
+        -ResourceGroupName $dcrRgName `
+        -Name $dcrName `
+        -Location $dcrLocation `
+        -DataSourceExtension @( $dcrDataSource ) `
+        -DestinationLogAnalytic @( $dcrDestination ) `
+        -DataFlow @( $dcrDataFlow ) `
+        -Tag @{ "createdBy" = "MicrosoftDefenderForSQL" } `
         -ErrorAction Stop
 } catch {
     Write-Host "$($dcrName) - Not Created in Resource Group $($dcrRgName) in Subscription $($dcrSubId)" -ForegroundColor Red
@@ -217,7 +234,7 @@ with the Azure Virtual Machines and/or Azure Arc for Server resources.
 $d4sqlDcr = Get-AzDataCollectionRule -Name $dcrName -ResourceGroupName $dcrRgName -SubscriptionId $dcrSubId
 
 # Get VMs from ARG Query - (Optional) Filter Your List of VMs
-$vmsWithSql = $argResults # | Where-Object { $_.subscriptionId -notIn $subscriptionIds }
+$vmsWithSql = $argResults | Where-Object { $_.subscriptionId -in $subscriptionIds }
 
 # Associate Virtual Machines
 foreach ( $vmResId in $vmsWithSql.vmResourceId ) {
